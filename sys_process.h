@@ -37,7 +37,7 @@ namespace System
         Process& operator=(const Process & other)   = default;
         Process& operator=(Process && other)        = default;
         
-        std::string get_command() const { return command_; } 
+        std::string get_command() const { return command_; }
         
         void kill_(pid_t pid)
         {
@@ -53,13 +53,13 @@ namespace System
              */
             if (forked_)
             {  // We actually have at least started the child. We don't care if it died right after
-               // If it crashed or errored out somehow, it will still hang around until another process
-               // waits for it and grabs the leftovers.
+                // If it crashed or errored out somehow, it will still hang around until another process
+                // waits for it and grabs the leftovers.
                 int status;
                 pid_t r;
                 do {
                     r = waitpid(pid, &status, WNOHANG);
-                // repeat if the process was interrupted somehow.
+                    // repeat if the process was interrupted somehow.
                 } while (r == -1 && errno == EINTR);
                 
                 // the child is still running, so kill it and wait for it to die.
@@ -82,9 +82,9 @@ namespace System
                 r = waitpid(child_pid_, &status, WNOHANG);
                 // repeat if the process was interrupted somehow.
             } while (r == -1 && errno == EINTR);
-
+            
             if (r == 0) return true; // child is still alive.
-            else if ( (r == -1 && errno == ECHILD ) || (r == child_pid_) ) 
+            else if ( (r == -1 && errno == ECHILD ) || (r == child_pid_) )
             {
                 // there is no child process to wait, or it crashed/exited/terminated otherwise.
                 // all it means is that we no longer have a forked process to talk to.
@@ -126,7 +126,7 @@ namespace System
             { // parent process
                 std::cout << "Starting process with PID: " << process_p << '\n';
                 
-              // close the copy of fds used by the child, but held by the parent.
+                // close the copy of fds used by the child, but held by the parent.
                 close(out_pipe_[0]);
                 close(in_pipe_[1]);
                 
@@ -136,7 +136,7 @@ namespace System
             }
             else
             { // child process
-              // ignore the interrupt signals in the child process, the parent process will handle it.
+                // ignore the interrupt signals in the child process, the parent process will handle it.
                 signal(SIGINT, SIG_IGN);
                 
                 // close the copy of the fds used by the parent, but held by the child
@@ -206,7 +206,7 @@ namespace System
         // If the expected string is specified, the function will scan the output
         // for the requested string, returning true if it finds it, or false if it times out.
         // if left empty, the function will return true on timeout.
-        bool read(std::vector<std::string> &out_lines, 
+        bool read(std::vector<std::string> &out_lines,
                   const std::string &expected = "", int timeout_ms = 0)
         {
             out_lines.clear();
@@ -234,17 +234,17 @@ namespace System
                         out_lines.push_back(curr_line);
                     break;
                 }
-
-                /* 
+                
+                /*
                  When a pipe is closed from the other side (i.e. the child process terminates)
                  poll returns an revent of POLLIN/POLLHUP to signal "EOF".
                  highly OS specific: see http://www.greenend.org.uk/rjk/tech/poll.html.
-                
+                 
                  Linux/SunOS: POLLHUP   MacOS/FreeBSD: POLLIN|POLLHUP      OpenBSD/etc: POLLIN
                  We check for both POLLIN and POLLHUP, in case there is still data to read.
                  We rely on read to tell us if we reach the EOF.
-                */
-                int bytes_read = 0;
+                 */
+                size_t bytes_read = 0;
                 if ( (fds.revents & POLLIN) || (fds.events & POLLHUP))
                 {
                     bytes_read = ::read(fds.fd, buffer, sizeof(buffer));
@@ -258,14 +258,15 @@ namespace System
                     
                     for (int i = 0; i < bytes_read; i++) {
                         if (buffer[i] == '\n') {
+                            if (curr_line.empty()) continue;
+                            
                             out_lines.push_back(curr_line);
                             // check if the current line has the expected substring. If it does, stop here.
-                            if (curr_line.empty()) continue;
                             if (!expected.empty()) {
                                 if (curr_line.rfind(expected, 0) != std::string::npos)
                                     return true;
                             }
-                                
+                            
                             curr_line.clear();
                         } else curr_line += buffer[i];
                     }
@@ -285,61 +286,61 @@ namespace System
             if (input[input.size()] != '\n')
                 input.append("\n");
             
-//            std::cout << ">> " << input;
+            //            std::cout << ">> " << input;
             if ( write(out_pipe_[1], input.c_str(), input.size()) == -1 )
                 throw std::runtime_error("Error: could not send command to the process");
         }
         
         // the mirror logic needs to be reworked. when the mirror reads from the in pipe, it steals
         // the data from pipe for the parent process. we need to duplicate it somehow.
-//        void stop_mirror()
-//        {
-//            kill_(mirror_pid_);
-//        }
-//        
-//        void mirror_output()
-//        {
-//            
-//            pid_t mirror_p = fork();
-//            if (mirror_p) {
-//                mirror_pid_ = mirror_p;
-//            } else {
-//                // make a fd non-blocking (only useful if we use a tight read loop, not when polling).
-//                // fcntl(in_pipe_[0], F_SETFL, fcntl(in_pipe_[0], F_GETFL) | O_NONBLOCK);
-//                
-//                char buffer[2048];
-//                std::string curr_line {};
-//                
-//                while (true)
-//                {
-//                    // we use pread instead of read, so that we can use the same data again in subsequent reads.
-//                    const int bytes_read = ::read(in_pipe_[0], buffer, sizeof(buffer));
-//                    
-//                    if (bytes_read == -1 && errno == EAGAIN) continue;
-//                    if (bytes_read == -1 && errno != EAGAIN)
-//                    {
-//                        std::cout << "errno: " << strerror(errno) << " ";
-//                        throw std::runtime_error("read() failed");
-//                    }
-//                    if (bytes_read == 0)
-//                    {
-//                        std::cout << ">> " << curr_line << std::endl;
-//                        break;
-//                    }
-//                    
-//                    for (int i = 0; i < bytes_read; i++) {
-//                        if (buffer[i] == '\n') {
-//                            std::cout << ">> " << curr_line << std::endl;
-//                            curr_line += '\n';
-//                            write(in_pipe_[1], curr_line.c_str(), curr_line.size());
-//                            curr_line.clear();
-//                        } else {
-//                            curr_line += buffer[i];
-//                        }
-//                    }
-//                }
-//            }
-//        }
+        //        void stop_mirror()
+        //        {
+        //            kill_(mirror_pid_);
+        //        }
+        //
+        //        void mirror_output()
+        //        {
+        //
+        //            pid_t mirror_p = fork();
+        //            if (mirror_p) {
+        //                mirror_pid_ = mirror_p;
+        //            } else {
+        //                // make a fd non-blocking (only useful if we use a tight read loop, not when polling).
+        //                // fcntl(in_pipe_[0], F_SETFL, fcntl(in_pipe_[0], F_GETFL) | O_NONBLOCK);
+        //
+        //                char buffer[2048];
+        //                std::string curr_line {};
+        //
+        //                while (true)
+        //                {
+        //                    // we use pread instead of read, so that we can use the same data again in subsequent reads.
+        //                    const int bytes_read = ::read(in_pipe_[0], buffer, sizeof(buffer));
+        //
+        //                    if (bytes_read == -1 && errno == EAGAIN) continue;
+        //                    if (bytes_read == -1 && errno != EAGAIN)
+        //                    {
+        //                        std::cout << "errno: " << strerror(errno) << " ";
+        //                        throw std::runtime_error("read() failed");
+        //                    }
+        //                    if (bytes_read == 0)
+        //                    {
+        //                        std::cout << ">> " << curr_line << std::endl;
+        //                        break;
+        //                    }
+        //
+        //                    for (int i = 0; i < bytes_read; i++) {
+        //                        if (buffer[i] == '\n') {
+        //                            std::cout << ">> " << curr_line << std::endl;
+        //                            curr_line += '\n';
+        //                            write(in_pipe_[1], curr_line.c_str(), curr_line.size());
+        //                            curr_line.clear();
+        //                        } else {
+        //                            curr_line += buffer[i];
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
         
     public:
         std::string command_;
